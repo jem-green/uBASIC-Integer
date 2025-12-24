@@ -35,7 +35,7 @@
 typedef VARIABLE_TYPE (*peek_func)(VARIABLE_TYPE);
 typedef void (*poke_func)(VARIABLE_TYPE, VARIABLE_TYPE);
 
-// Possibly public
+// Public
 
 void ubasic_init(const char *program);
 void ubasic_run(void);

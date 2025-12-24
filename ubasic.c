@@ -89,6 +89,8 @@ peek_func peek_function = NULL;
 poke_func poke_function = NULL;
 
 /*---------------------------------------------------------------------------*/
+//Public functions
+/*---------------------------------------------------------------------------*/
 void ubasic_init(const char *program){
   program_ptr = program;
   for_stack_ptr = gosub_stack_ptr = 0;
@@ -122,6 +124,7 @@ void ubasic_run(void){
   line_statement();
 }
 
+/*---------------------------------------------------------------------------*/
 // Private functions
 /*---------------------------------------------------------------------------*/
 static void accept(int token){
