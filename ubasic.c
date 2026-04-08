@@ -70,17 +70,16 @@ static int32_t *gosub_depth_cell = NULL;
 static int32_t *for_depth_cell = NULL;
 static int32_t *gosub_stack_mem = NULL;
 static for_state *for_stack = NULL;
+static VARIABLE_TYPE *variables_mem = NULL;
 
 struct line_index {
   int line_number;
   char const *program_text_position;
   struct line_index *next;
 };
+
 struct line_index *line_index_head = NULL;
 struct line_index *line_index_current = NULL;
-
-#define MAX_VARNUM 26
-static VARIABLE_TYPE variables[MAX_VARNUM];
 
 static int ended;
 
@@ -97,8 +96,10 @@ void ubasic_init(uint8_t *memory) {
   for_depth_cell = (int32_t *)(memory + UBASIC_MEM_FOR_DEPTH_OFFSET);
   gosub_stack_mem = (int32_t *)(memory + UBASIC_MEM_GOSUB_STACK_OFFSET);
   for_stack = (for_state *)(memory + UBASIC_MEM_FOR_STACK_OFFSET);
+  variables_mem = (VARIABLE_TYPE *)(memory + UBASIC_MEM_VARIABLES_OFFSET);
   *gosub_depth_cell = 0;
   *for_depth_cell = 0;
+  memset(variables_mem, 0, UBASIC_VARIABLE_COUNT * sizeof(VARIABLE_TYPE));
   program_ptr = (char const *)(memory + UBASIC_MEM_PROGRAM_OFFSET);
   memory[UBASIC_MEM_PROGRAM_OFFSET] = '\0';
   index_free();
@@ -167,15 +168,14 @@ void ubasic_run(void){
   }
   line_statement();
 }
-
 /*---------------------------------------------------------------------------*/
 // Private functions
 /*---------------------------------------------------------------------------*/
 static void accept(int token){
   if(token != tokenizer_token()) {
     DEBUG_PRINTF("accept: Token not what was expected (expected '%s', got %s).\n",
-		tokenizer_token_name(token),
-		tokenizer_token_name(tokenizer_token()));
+	tokenizer_token_name(token),
+	tokenizer_token_name(tokenizer_token()));
     tokenizer_error_print();
     exit(1);
   }
@@ -185,7 +185,7 @@ static void accept(int token){
 /*---------------------------------------------------------------------------*/
 static int varfactor(void){
   int r;
-  DEBUG_PRINTF("varfactor: obtaining %d from variable %d.\n", variables[tokenizer_variable_num()], tokenizer_variable_num());
+  DEBUG_PRINTF("varfactor: obtaining %d from variable %d.\n", get_variable(tokenizer_variable_num()), tokenizer_variable_num());
   r = get_variable(tokenizer_variable_num());
   accept(TOKENIZER_VARIABLE);
   return r;
@@ -437,8 +437,8 @@ static void print_statement(void) {
     } else if(tokenizer_token() == TOKENIZER_SEMICOLON) {
       tokenizer_next();
     } else if(tokenizer_token() == TOKENIZER_VARIABLE ||
-        tokenizer_token() == TOKENIZER_NUMBER) {
-		sprintf(buf+strlen(buf), "%d", expr());
+      tokenizer_token() == TOKENIZER_NUMBER) {
+      sprintf(buf+strlen(buf), "%d", expr());
     } else if (tokenizer_token() == TOKENIZER_CR){
       tokenizer_next();
     } else {
@@ -488,7 +488,7 @@ static void let_statement(void){
   accept(TOKENIZER_EQ);
   set_variable(var, expr());
   #if VERBOSE
-    DEBUG_PRINTF("let_statement: assign %d to %d.\n", variables[var], var);
+    DEBUG_PRINTF("let_statement: assign %d to %d.\n", get_variable(var), var);
   #endif
   accept(TOKENIZER_LF);
 
@@ -520,7 +520,7 @@ static void return_statement(void){
     DEBUG_PRINTF("return_statement: non-matching return.\n");
   }
 }
-
+/*---------------------------------------------------------------------------*/
 static void rem_statement(void) {
   accept(TOKENIZER_REM);
   DEBUG_PRINTF("rem_statement: Skipping comment.\n");
@@ -529,7 +529,6 @@ static void rem_statement(void) {
     accept(TOKENIZER_LF);
   }
 }
-
 /*---------------------------------------------------------------------------*/
 static void next_statement(void){
   int var;
@@ -538,7 +537,7 @@ static void next_statement(void){
   var = tokenizer_variable_num();
   accept(TOKENIZER_VARIABLE);
   if(*for_depth_cell > 0 &&
-     var == (int)(for_stack[*for_depth_cell - 1].for_variable - 'a')) {
+     var == (int)for_stack[*for_depth_cell - 1].for_variable_index) {
     for_state top = for_stack[*for_depth_cell - 1];
     set_variable(var, get_variable(var) + 1);
     if(get_variable(var) <= top.to) {
@@ -549,8 +548,8 @@ static void next_statement(void){
     }
   } else {
     if (*for_depth_cell > 0) {
-      DEBUG_PRINTF("next_statement: non-matching next (expected %c, found %c).\n",
-          for_stack[*for_depth_cell - 1].for_variable, (char)('a' + var));
+      DEBUG_PRINTF("next_statement: non-matching next (expected %d, found %d).\n",
+          (int)for_stack[*for_depth_cell - 1].for_variable_index, var);
     }
     accept(TOKENIZER_LF);
   }
@@ -569,15 +568,14 @@ static void for_statement(void) {
   to = expr();
   accept(TOKENIZER_LF);
 
-  
-    for_state st;
-    st.line_after_for = (int32_t)tokenizer_num();
-    st.for_variable = (char)('a' + for_variable);
-    st.to = (int32_t)to;
-    for_push(st);
-    #if VERBOSE
-      DEBUG_PRINTF("for_statement: new for, var %c to %d.\n", st.for_variable, (int)st.to);
-    #endif
+  for_state st;
+  st.line_after_for = (int32_t)tokenizer_num();
+  st.for_variable_index = (int32_t)for_variable;
+  st.to = (int32_t)to;
+  for_push(st);
+  #if VERBOSE
+    DEBUG_PRINTF("for_statement: new for, var %d to %d.\n", (int)st.for_variable_index, (int)st.to);
+  #endif
   
 }
 /*---------------------------------------------------------------------------*/
@@ -677,14 +675,14 @@ static void line_statement(void){
 }
 /*---------------------------------------------------------------------------*/
 static void set_variable(int varnum, VARIABLE_TYPE value){
-  if(varnum >= 0 && varnum <= MAX_VARNUM) {
-    variables[varnum] = value;
+  if(variables_mem != NULL && varnum >= 0 && varnum < UBASIC_VARIABLE_COUNT) {
+    variables_mem[varnum] = value;
   }
 }
 /*---------------------------------------------------------------------------*/
 static VARIABLE_TYPE get_variable(int varnum){
-  if(varnum >= 0 && varnum <= MAX_VARNUM) {
-    return variables[varnum];
+  if(variables_mem != NULL && varnum >= 0 && varnum < UBASIC_VARIABLE_COUNT) {
+    return variables_mem[varnum];
   }
   return 0;
 }
@@ -700,8 +698,9 @@ static int32_t gosub_pop(void) {
   return gosub_stack_mem[ptr];
 }
 
-/*---------------------------------------------------------------------------*/
 
+
+/*---------------------------------------------------------------------------*/
 static void gosub_push(int32_t line_num) {
   int32_t ptr = *gosub_depth_cell;
   if (ptr >= UBASIC_MAX_GOSUB_STACK_DEPTH) {
@@ -711,9 +710,7 @@ static void gosub_push(int32_t line_num) {
   gosub_stack_mem[ptr] = line_num;
   *gosub_depth_cell = ptr + 1;
 }
-
 /*---------------------------------------------------------------------------*/
-
 static void for_push(for_state state) {
   int32_t depth = *for_depth_cell;
   if (depth < UBASIC_MAX_FOR_STACK_DEPTH) {
@@ -723,7 +720,7 @@ static void for_push(for_state state) {
     DEBUG_PRINTF("for_push: for stack depth exceeded.\n");
   }
 }
-
+/*---------------------------------------------------------------------------*/
 static for_state for_pop(void) {
   for_state error_state = {-1, '\0', 0};
   int32_t depth = *for_depth_cell;
@@ -736,6 +733,7 @@ static for_state for_pop(void) {
     return error_state;
   }
 }
+/*---------------------------------------------------------------------------*/
 
 
 
