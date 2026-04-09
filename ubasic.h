@@ -69,7 +69,7 @@ typedef struct for_state {
 
 #define UBASIC_MIN_MEMORY_BYTES (UBASIC_MEM_PROGRAM_OFFSET + 1u)
 
-// Possibly public
+// Public
 
 void ubasic_init(uint8_t *memory);
 void ubasic_reset(void);

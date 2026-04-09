@@ -42,8 +42,10 @@ static const char program[] =
 
 /*---------------------------------------------------------------------------*/
 int main(int argc, char* argv[]) {
-  ubasic_init(program);
-
+  
+  char memory[4096];
+  ubasic_init(memory);
+  ubasic_load_program(program);
   do {
     ubasic_run();
   } while(!ubasic_finished());

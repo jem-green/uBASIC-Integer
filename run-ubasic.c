@@ -40,6 +40,7 @@ int main(int argc, char **argv, char **envp)
   char *q;
   char **p;
   char *prog;
+  char memory[4096];
   char buffer[15000];
   int infile;
 
@@ -66,7 +67,8 @@ int main(int argc, char **argv, char **envp)
     return (0);
   }
 
-  ubasic_init(prog);
+  ubasic_init(memory);
+  ubasic_load_program(prog);
   do {
     ubasic_run();
   } while(!ubasic_finished());

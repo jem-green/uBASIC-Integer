@@ -97,14 +97,9 @@ void ubasic_init(uint8_t *memory) {
   gosub_stack_mem = (int32_t *)(memory + UBASIC_MEM_GOSUB_STACK_OFFSET);
   for_stack = (for_state *)(memory + UBASIC_MEM_FOR_STACK_OFFSET);
   variables_mem = (VARIABLE_TYPE *)(memory + UBASIC_MEM_VARIABLES_OFFSET);
-  *gosub_depth_cell = 0;
-  *for_depth_cell = 0;
-  memset(variables_mem, 0, UBASIC_VARIABLE_COUNT * sizeof(VARIABLE_TYPE));
   program_ptr = (char const *)(memory + UBASIC_MEM_PROGRAM_OFFSET);
-  memory[UBASIC_MEM_PROGRAM_OFFSET] = '\0';
   index_free();
   tokenizer_init(program_ptr);
-  ended = 0;
   #if VERBOSE
     DEBUG_PRINTF("ubasic_init: Initializing uBasic.\n");
   #endif
@@ -128,13 +123,22 @@ void ubasic_reset(void) {
   if (for_depth_cell != NULL) {
     *for_depth_cell = 0;
   }
+  if (gosub_stack_mem != NULL) {
+    memset(gosub_stack_mem, 0, UBASIC_MAX_GOSUB_STACK_DEPTH * sizeof(int32_t));
+  }
+  if (for_stack != NULL) {
+    memset(for_stack, 0, UBASIC_MAX_FOR_STACK_DEPTH * sizeof(for_state));
+  }
+  if (variables_mem != NULL) {
+    memset(variables_mem, 0, UBASIC_VARIABLE_COUNT * sizeof(VARIABLE_TYPE));
+  }
   ended = 0;
 
   #if VERBOSE
     DEBUG_PRINTF("ubasic_reset: Resetting uBasic.\n");
   #endif
 }
-
+/*---------------------------------------------------------------------------*/
 void ubasic_load_program(const char *program) {
   size_t len;
 
@@ -142,14 +146,11 @@ void ubasic_load_program(const char *program) {
     DEBUG_PRINTF("ubasic_load_program: call ubasic_init first.\n");
     return;
   }
-  index_free();
+  ubasic_reset();
   len = strlen(program);
   memcpy(mem_base + UBASIC_MEM_PROGRAM_OFFSET, program, len + 1);
   program_ptr = (char const *)(mem_base + UBASIC_MEM_PROGRAM_OFFSET);
   tokenizer_init(program_ptr);
-  *gosub_depth_cell = 0;
-  *for_depth_cell = 0;
-  ended = 0;
   #if VERBOSE
     DEBUG_PRINTF("ubasic_load_program: Loaded program of length %u.\n", (unsigned)len);
   #endif
@@ -697,9 +698,6 @@ static int32_t gosub_pop(void) {
   *gosub_depth_cell = ptr;
   return gosub_stack_mem[ptr];
 }
-
-
-
 /*---------------------------------------------------------------------------*/
 static void gosub_push(int32_t line_num) {
   int32_t ptr = *gosub_depth_cell;
