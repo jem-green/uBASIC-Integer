@@ -41,10 +41,12 @@ static const char program[] =
 110 return\n";
 
 /*---------------------------------------------------------------------------*/
+#define MEMORY_SIZE 4096
+
 int main(int argc, char* argv[]) {
   
-  char memory[4096];
-  ubasic_init(memory);
+  char memory[MEMORY_SIZE];
+  ubasic_init((uint8_t*)memory, MEMORY_SIZE);
   ubasic_load_program(program);
   do {
     ubasic_run();

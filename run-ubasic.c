@@ -35,12 +35,15 @@
 /*---------------------------------------------------------------------------*/
 // main routine modified to allow execution of BASIC script files 
 
+/*---------------------------------------------------------------------------*/
+#define MEMORY_SIZE 4096
+
 int main(int argc, char **argv, char **envp)
 {
   char *q;
   char **p;
   char *prog;
-  char memory[4096];
+  char memory[MEMORY_SIZE];
   char buffer[15000];
   int infile;
 
@@ -67,7 +70,7 @@ int main(int argc, char **argv, char **envp)
     return (0);
   }
 
-  ubasic_init(memory);
+  ubasic_init((uint8_t*)memory, MEMORY_SIZE);
   ubasic_load_program(prog);
   do {
     ubasic_run();

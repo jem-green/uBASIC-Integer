@@ -204,7 +204,7 @@ static int get_next_token(void) {
     }
   }
 
-  if(*ptr >= 'a' && *ptr <= 'z') {
+  if((*ptr >= 'a' && *ptr <= 'z') || (*ptr >= 'A' && *ptr <= 'Z')) {
     nextptr = ptr + 1;
     return TOKENIZER_VARIABLE;
   }
@@ -253,7 +253,7 @@ void tokenizer_next(void){
   #endif
 }
 /*---------------------------------------------------------------------------*/
-void tokeniser_skip(void) {
+void tokenizer_skip(void) {
   while(!(*nextptr == '\n' || tokenizer_finished())) {
         ++nextptr;
   }
@@ -261,7 +261,9 @@ void tokeniser_skip(void) {
     nextptr++;
   }
   ptr = nextptr;
+  current_token = get_next_token();
 }
+
 /*---------------------------------------------------------------------------*/
 VARIABLE_TYPE tokenizer_num(void)
 {
@@ -298,7 +300,13 @@ int tokenizer_finished(void) {
 
 /*---------------------------------------------------------------------------*/
 int tokenizer_variable_num(void) {
-  return *ptr - 'a';
+  if(*ptr >= 'a' && *ptr <= 'z') {
+    return *ptr - 'a';
+  }
+  if(*ptr >= 'A' && *ptr <= 'Z') {
+    return 26 + (*ptr - 'A');
+  }
+  return -1;
 }
 /*---------------------------------------------------------------------------*/
 char const *tokenizer_pos(void){
