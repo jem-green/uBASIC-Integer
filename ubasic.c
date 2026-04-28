@@ -47,8 +47,6 @@
 
 // Probably private
 
-typedef VARIABLE_TYPE (*peek_func)(VARIABLE_TYPE);
-typedef void (*poke_func)(VARIABLE_TYPE, VARIABLE_TYPE);
 static VARIABLE_TYPE expr(void);
 static void line_statement(void);
 static void statement(void);
@@ -68,6 +66,7 @@ static char string[MAX_STRINGLEN];
 
 static uint8_t *mem_base = NULL;
 static size_t mem_capacity_bytes = 0;
+static int32_t *resume_offset_cell = NULL;
 static int32_t *gosub_depth_cell = NULL;
 static int32_t *for_depth_cell = NULL;
 static int32_t *gosub_stack_mem = NULL;
@@ -88,6 +87,16 @@ static int ended;
 peek_func peek_function = NULL;
 poke_func poke_function = NULL;
 
+/* I/O function pointers matching C# wrapper API */
+static void default_out_function(const char *message) {
+  printf("%s", message);
+}
+
+out_func out_function = default_out_function;  /* Default to printf wrapper */
+put_func put_function = NULL;
+in_func in_function = NULL;
+get_func get_function = NULL;
+
 /*
  * Buffer passed to ubasic_init (see UBASIC_*_OFFSET in ubasic.h):
  *   gosub depth, for depth, gosub stack[], for stack[],
@@ -96,26 +105,18 @@ poke_func poke_function = NULL;
 /*---------------------------------------------------------------------------*/
 //Public functions
 /*---------------------------------------------------------------------------*/
-/*---------------------------------------------------------------------------*/
 void ubasic_init(uint8_t *memory, uint32_t memory_bytes) {
-  size_t variables_offset;
-  
   mem_base = memory;
   mem_capacity_bytes = memory_bytes;
+  resume_offset_cell = (int32_t *)(memory + UBASIC_MEM_RESUME_OFFSET);
   gosub_depth_cell = (int32_t *)(memory + UBASIC_MEM_GOSUB_DEPTH_OFFSET);
   for_depth_cell = (int32_t *)(memory + UBASIC_MEM_FOR_DEPTH_OFFSET);
   gosub_stack_mem = (int32_t *)(memory + UBASIC_MEM_GOSUB_STACK_OFFSET);
   for_stack = (for_state *)(memory + UBASIC_MEM_FOR_STACK_OFFSET);
   
-  /* Variables at TOP of memory */
-  variables_offset = memory_bytes - UBASIC_VARIABLES_SIZE - UBASIC_HEAP_BYTES;
-  variables_mem = (VARIABLE_TYPE *)(memory + variables_offset);
-  
-  program_ptr = (char const *)(memory + UBASIC_MEM_PROGRAM_OFFSET);
-  index_free();
-  tokenizer_init(program_ptr);
+  /* Don't initialize program_ptr or variables_mem - allows snapshot restore */
   #if VERBOSE
-    DEBUG_PRINTF("ubasic_init: Variables at offset %zu (top of memory).\n", variables_offset);
+    DEBUG_PRINTF("ubasic_init: Base pointers set, ready for program load or snapshot restore.\n");
   #endif
 }
 /*---------------------------------------------------------------------------*/
@@ -130,7 +131,12 @@ void ubasic_init_peek_poke(uint8_t *memory, uint32_t memory_bytes,peek_func peek
 /*---------------------------------------------------------------------------*/
 static void reset_control_state(void) {
   index_free();
-  tokenizer_reset();
+  if (program_ptr != NULL) {
+    tokenizer_reset();
+  }
+  if (resume_offset_cell != NULL) {
+    *resume_offset_cell = 0;
+  }
   if (gosub_depth_cell != NULL) {
     *gosub_depth_cell = 0;
   }
@@ -159,32 +165,42 @@ void ubasic_reset(void) {
 /*---------------------------------------------------------------------------*/
 void ubasic_load_program(const char *program) {
   size_t len;
-  size_t available_program_bytes;
+  size_t variables_offset;
 
   if (mem_base == NULL) {
     DEBUG_PRINTF("ubasic_load_program: call ubasic_init first.\n");
     return;
   }
   
-  /* Reset control state but PRESERVE VARIABLES */
+  /* Reset control state */
   reset_control_state();
   
   len = strlen(program);
   
+  /* Variables placed immediately after program */
+  variables_offset = UBASIC_MEM_PROGRAM_OFFSET + len + 1;
+  
+  /* Check total memory needed */
   if (mem_capacity_bytes != 0) {
-    /* Check program fits between PROGRAM_OFFSET and variables */
-    size_t variables_offset = mem_capacity_bytes - UBASIC_VARIABLES_SIZE - UBASIC_HEAP_BYTES;
-    if (UBASIC_MEM_PROGRAM_OFFSET + len + 1 > variables_offset) {
-      DEBUG_PRINTF("ubasic_load_program: program too large.\n");
+    size_t total_needed = variables_offset + UBASIC_VARIABLES_SIZE + UBASIC_HEAP_BYTES;
+    if (total_needed > mem_capacity_bytes) {
+      DEBUG_PRINTF("ubasic_load_program: insufficient memory.\n");
       return;
     }
   }
   
+  /* Load program */
   memcpy(mem_base + UBASIC_MEM_PROGRAM_OFFSET, program, len + 1);
   program_ptr = (char const *)(mem_base + UBASIC_MEM_PROGRAM_OFFSET);
+  
+  /* Place and clear variables right after program */
+  variables_mem = (VARIABLE_TYPE *)(mem_base + variables_offset);
+  memset(variables_mem, 0, UBASIC_VARIABLE_COUNT * sizeof(VARIABLE_TYPE));
+  
+  index_free();
   tokenizer_init(program_ptr);
   #if VERBOSE
-    DEBUG_PRINTF("ubasic_load_program: Loaded %u bytes, variables preserved.\n", (unsigned)len);
+    DEBUG_PRINTF("ubasic_load_program: Loaded %u bytes, variables at offset %zu.\n", (unsigned)len, variables_offset);
   #endif
 }
 /*---------------------------------------------------------------------------*/
@@ -202,9 +218,40 @@ void ubasic_run(void){
   line_statement();
 }
 /*---------------------------------------------------------------------------*/
-//void ubasic_callback(Callback cb) {
-//    stored_callback = cb;
-//}
+static void save_position(void) {
+  const char *current_pos = tokenizer_pos();
+  const char *start_pos = tokenizer_start();
+  int32_t offset = (int32_t)(current_pos - start_pos);
+  
+  if (resume_offset_cell != NULL) {
+    *resume_offset_cell = offset;
+    #if VERBOSE
+      DEBUG_PRINTF("save_position: Saved offset %d.\n", offset);
+    #endif
+  }
+}
+/*---------------------------------------------------------------------------*/
+void ubasic_resume(void) {
+  int32_t offset;
+  const char *start_pos;
+  const char *resume_pos;
+  
+  if (resume_offset_cell == NULL || program_ptr == NULL) {
+    DEBUG_PRINTF("ubasic_resume: Not initialized.\n");
+    return;
+  }
+  
+  offset = *resume_offset_cell;
+  start_pos = tokenizer_start();
+  resume_pos = start_pos + offset;
+  
+  tokenizer_goto(resume_pos);
+  ended = 0;
+  
+  #if VERBOSE
+    DEBUG_PRINTF("ubasic_resume: Resumed from offset %d.\n", offset);
+  #endif
+}
 /*---------------------------------------------------------------------------*/
 // Private functions
 /*---------------------------------------------------------------------------*/
@@ -483,8 +530,8 @@ static void print_statement(void) {
     }
   } while(tokenizer_token() != TOKENIZER_LF &&
       tokenizer_token() != TOKENIZER_ENDOFINPUT);
-  printf(buf);
-  printf("\n");
+  out_function(buf);
+  out_function("\n");
   DEBUG_PRINTF("print_statement: End of print.\n");
   tokenizer_next();
 }
@@ -703,6 +750,9 @@ static void statement(void){
 }
 /*---------------------------------------------------------------------------*/
 static void line_statement(void){
+  /* Save position before executing line for resume capability */
+  save_position();
+  
   #if VERBOSE
     DEBUG_PRINTF("----------- Line number %d ---------\n", tokenizer_num());
   #endif
@@ -766,6 +816,10 @@ static for_state for_pop(void) {
     DEBUG_PRINTF("for_pop: for stack underflow.\n");
     return error_state;
   }
+}
+/*---------------------------------------------------------------------------*/
+void ubasic_set_out_function(out_func func) {
+  out_function = func;
 }
 /*---------------------------------------------------------------------------*/
 

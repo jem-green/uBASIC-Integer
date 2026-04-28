@@ -37,19 +37,23 @@
 
 typedef VARIABLE_TYPE (*peek_func)(VARIABLE_TYPE);
 typedef void (*poke_func)(VARIABLE_TYPE, VARIABLE_TYPE);
+typedef void (*out_func)(const char *);
+typedef void (*put_func)(VARIABLE_TYPE);
+typedef VARIABLE_TYPE (*in_func)(void);
+typedef VARIABLE_TYPE (*get_func)(void);
 
 /*
  * Classic 8-bit BASIC memory layout:
  *   LOW ADDRESSES (start of buffer):
- *     int32_t gosub_depth at offset 0
- *     int32_t for_depth at offset 4
+ *     int32_t resume_offset at offset 0 (tokenizer position for resume)
+ *     int32_t gosub_depth at offset 4
+ *     int32_t for_depth at offset 8
  *     int32_t gosub_stack[UBASIC_MAX_GOSUB_STACK_DEPTH]
  *     struct for_state for_stack[UBASIC_MAX_FOR_STACK_DEPTH]
- *     program bytes (NUL-terminated, grows upward)
- *   
- *   HIGH ADDRESSES (top of buffer, when using ubasic_init_sized):
+ *     program bytes (NUL-terminated)
+ *     VARIABLE_TYPE variables[UBASIC_VARIABLE_COUNT] (after program)
  *     uint8_t heap[UBASIC_HEAP_BYTES] (optional, for future string/double)
- *     VARIABLE_TYPE variables[UBASIC_VARIABLE_COUNT] (AT TOP)
+ *   HIGH ADDRESSES: (free space)
  */
 #define UBASIC_MAX_GOSUB_STACK_DEPTH 10
 #define UBASIC_MAX_FOR_STACK_DEPTH 4
@@ -61,29 +65,37 @@ typedef void (*poke_func)(VARIABLE_TYPE, VARIABLE_TYPE);
 
 typedef struct for_state {
   int32_t line_after_for;
-  int32_t for_variable_index; /* 0..51 (a-z then A-Z) */
+  int32_t for_variable_index; /* 0..26 (a-z) */
   int32_t to;
 } for_state;
 
 /* Control state at low addresses */
-#define UBASIC_MEM_GOSUB_DEPTH_OFFSET 0
-#define UBASIC_MEM_FOR_DEPTH_OFFSET   4
-#define UBASIC_MEM_GOSUB_STACK_OFFSET 8
+#define UBASIC_MEM_RESUME_OFFSET      0
+#define UBASIC_MEM_GOSUB_DEPTH_OFFSET 4
+#define UBASIC_MEM_FOR_DEPTH_OFFSET   8
+#define UBASIC_MEM_GOSUB_STACK_OFFSET 12
 #define UBASIC_MEM_FOR_STACK_OFFSET \
   (UBASIC_MEM_GOSUB_STACK_OFFSET + UBASIC_MAX_GOSUB_STACK_DEPTH * (int)sizeof(int32_t))
 #define UBASIC_MEM_PROGRAM_OFFSET \
   (UBASIC_MEM_FOR_STACK_OFFSET + UBASIC_MAX_FOR_STACK_DEPTH * (int)sizeof(for_state))
 
-/* Variables at top (calculated at runtime) */
+/* Variables placed after program (calculated at runtime) */
 #define UBASIC_VARIABLES_SIZE (UBASIC_VARIABLE_COUNT * (int)sizeof(VARIABLE_TYPE))
-#define UBASIC_MIN_MEMORY_BYTES (UBASIC_MEM_PROGRAM_OFFSET + 1u + UBASIC_HEAP_BYTES + UBASIC_VARIABLES_SIZE)
+#define UBASIC_MIN_MEMORY_BYTES (UBASIC_MEM_PROGRAM_OFFSET + 1u + UBASIC_VARIABLES_SIZE + UBASIC_HEAP_BYTES)
 
 // Public
 
-void ubasic_init(uint8_t *memory, uint32_t memory_bytes);  /* Vars at top */
-void ubasic_reset(void);
+void ubasic_init(uint8_t *memory, uint32_t memory_bytes);  /* Minimal init for snapshot restore */
+void ubasic_reset(void);  /* Clears variables */
 void ubasic_run(void);
 int ubasic_finished(void);
-void ubasic_load_program(const char *program);
+void ubasic_load_program(const char *program); /* Preserves vars */
+void ubasic_resume(void);  /* Resume from saved position in memory */
+
+/* I/O function setters matching C# wrapper API */
+void ubasic_set_out_function(out_func func);
+void ubasic_set_put_function(put_func func);
+void ubasic_set_in_function(in_func func);
+void ubasic_set_get_function(get_func func);
 
 #endif /* __UBASIC_H__ */

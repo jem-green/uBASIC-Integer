@@ -54,22 +54,22 @@ struct keyword_token {
 static int current_token = TOKENIZER_ERROR;
 
 static const struct keyword_token keywords[] = {
-  {"let", TOKENIZER_LET},
-  {"print", TOKENIZER_PRINT},
-  {"if", TOKENIZER_IF},
-  {"then", TOKENIZER_THEN},
-  {"else", TOKENIZER_ELSE},
-  {"for", TOKENIZER_FOR},
-  {"to", TOKENIZER_TO},
-  {"next", TOKENIZER_NEXT},
-  {"goto", TOKENIZER_GOTO},
-  {"gosub", TOKENIZER_GOSUB},
-  {"return", TOKENIZER_RETURN},
-  {"call", TOKENIZER_CALL},
-  {"rem", TOKENIZER_REM},
-  {"peek", TOKENIZER_PEEK},
-  {"poke", TOKENIZER_POKE},
-  {"end", TOKENIZER_END},
+  {"LET", TOKENIZER_LET},
+  {"PRINT", TOKENIZER_PRINT},
+  {"IF", TOKENIZER_IF},
+  {"THEN", TOKENIZER_THEN},
+  {"ELSE", TOKENIZER_ELSE},
+  {"FOR", TOKENIZER_FOR},
+  {"TO", TOKENIZER_TO},
+  {"NEXT", TOKENIZER_NEXT},
+  {"GOTO", TOKENIZER_GOTO},
+  {"GOSUB", TOKENIZER_GOSUB},
+  {"RETURN", TOKENIZER_RETURN},
+  {"CALL", TOKENIZER_CALL},
+  {"REM", TOKENIZER_REM},
+  {"PEEK", TOKENIZER_PEEK},
+  {"POKE", TOKENIZER_POKE},
+  {"END", TOKENIZER_END},
   {NULL, TOKENIZER_ERROR}
 };
 
@@ -263,7 +263,6 @@ void tokenizer_skip(void) {
   ptr = nextptr;
   current_token = get_next_token();
 }
-
 /*---------------------------------------------------------------------------*/
 VARIABLE_TYPE tokenizer_num(void)
 {

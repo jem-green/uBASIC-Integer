@@ -9,6 +9,6 @@ The (non-interactive) uBASIC interpreter supports only the most basic BASIC func
 
 Updated to enable uBasic to passed a basic file from the command line. 
 
-Added a c# wrapper so we can run in a WinForm
+http://www.zenoshrdlu.com/kapstuff/zsubasic.html
 
-https://github.com/jem-green/uBasic
+Largely for fun I decided to add string handling. The version downloadable here is a stand-alone interpreter that does not include the CHDK enhancements (that version is here) so for example, all lines must have line numbers). It offers the following enhancements over Adam's original:
