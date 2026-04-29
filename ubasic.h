@@ -76,10 +76,11 @@ typedef struct for_state {
 #define UBASIC_MEM_GOSUB_STACK_OFFSET 12
 #define UBASIC_MEM_FOR_STACK_OFFSET \
   (UBASIC_MEM_GOSUB_STACK_OFFSET + UBASIC_MAX_GOSUB_STACK_DEPTH * (int)sizeof(int32_t))
+/* Program starts immediately after control structures */
 #define UBASIC_MEM_PROGRAM_OFFSET \
   (UBASIC_MEM_FOR_STACK_OFFSET + UBASIC_MAX_FOR_STACK_DEPTH * (int)sizeof(for_state))
 
-/* Variables placed after program (calculated at runtime) */
+/* Variables placed in LOW memory after program (calculated at runtime) */
 #define UBASIC_VARIABLES_SIZE (UBASIC_VARIABLE_COUNT * (int)sizeof(VARIABLE_TYPE))
 #define UBASIC_MIN_MEMORY_BYTES (UBASIC_MEM_PROGRAM_OFFSET + 1u + UBASIC_VARIABLES_SIZE + UBASIC_HEAP_BYTES)
 

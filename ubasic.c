@@ -47,6 +47,8 @@
 
 // Probably private
 
+typedef VARIABLE_TYPE (*peek_func)(VARIABLE_TYPE);
+typedef void (*poke_func)(VARIABLE_TYPE, VARIABLE_TYPE);
 static VARIABLE_TYPE expr(void);
 static void line_statement(void);
 static void statement(void);
@@ -86,8 +88,7 @@ static int ended;
 
 peek_func peek_function = NULL;
 poke_func poke_function = NULL;
-
-/* I/O function pointers matching C# wrapper API */
+/* I/O function pointer */
 static void default_out_function(const char *message) {
   printf("%s", message);
 }
@@ -165,6 +166,7 @@ void ubasic_reset(void) {
 /*---------------------------------------------------------------------------*/
 void ubasic_load_program(const char *program) {
   size_t len;
+  size_t program_end;
   size_t variables_offset;
 
   if (mem_base == NULL) {
@@ -176,9 +178,11 @@ void ubasic_load_program(const char *program) {
   reset_control_state();
   
   len = strlen(program);
+  program_end = UBASIC_MEM_PROGRAM_OFFSET + len + 1;
   
   /* Variables placed immediately after program */
-  variables_offset = UBASIC_MEM_PROGRAM_OFFSET + len + 1;
+  variables_offset = program_end;
+
   
   /* Check total memory needed */
   if (mem_capacity_bytes != 0) {
@@ -506,8 +510,10 @@ static void goto_statement(void) {
 }
 /*---------------------------------------------------------------------------*/
 static void print_statement(void) {
+  // string additions - buffer for complete line
   static char buf[128];
   buf[0]=0;
+  // end of string additions
   accept(TOKENIZER_PRINT);
   DEBUG_PRINTF("print_statement: Loop.\n");
   do {
