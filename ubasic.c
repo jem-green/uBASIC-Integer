@@ -76,7 +76,7 @@ static for_state *for_stack = NULL;
 static VARIABLE_TYPE *variables_mem = NULL;
 
 struct line_index {
-  int line_number;
+  uint32_t line_number;
   char const *program_text_position;
   struct line_index *next;
 };
@@ -400,7 +400,7 @@ static void index_free(void) {
   if(line_index_head != NULL) {
     line_index_current = line_index_head;
     do {
-      DEBUG_PRINTF("index_free: Freeing index for line %d.\n", line_index_current->line_number);
+      DEBUG_PRINTF("index_free: Freeing index for line %u.\n", line_index_current->line_number);
       line_index_head = line_index_current;
       line_index_current = line_index_current->next;
       free(line_index_head);
@@ -409,7 +409,7 @@ static void index_free(void) {
   }
 }
 /*---------------------------------------------------------------------------*/
-static char const* index_find(int linenum) {
+static char const* index_find(uint32_t linenum) {
   struct line_index *lidx;
   lidx = line_index_head;
 
@@ -423,7 +423,7 @@ static char const* index_find(int linenum) {
     #if DEBUG
     	#if VERBOSE
       		if(lidx != NULL) {
-        		DEBUG_PRINTF("index_find: Step %3d. Found index for line %d: %p.\n",
+        		DEBUG_PRINTF("index_find: Step %3d. Found index for line %u: %p.\n",
         		step,
         		lidx->line_number,
         		lidx->program_text_position - tokenizer_start());
@@ -435,7 +435,7 @@ static char const* index_find(int linenum) {
   if(lidx != NULL && lidx->line_number == linenum) {
     #if DEBUG
     	#if VERBOSE
-      		DEBUG_PRINTF("index_find: Returning index for line %d.\n", linenum);
+      		DEBUG_PRINTF("index_find: Returning index for line %u.\n", linenum);
     	#endif
     #endif
     return lidx->program_text_position;
@@ -444,7 +444,7 @@ static char const* index_find(int linenum) {
   return NULL;
 }
 /*---------------------------------------------------------------------------*/
-static void index_add(int linenum, char const* sourcepos) {
+static void index_add(uint32_t linenum, char const* sourcepos) {
   if(line_index_head != NULL && index_find(linenum)) {
     return;
   }
@@ -465,13 +465,13 @@ static void index_add(int linenum, char const* sourcepos) {
   }
   #if DEBUG
   	#if VERBOSE
-		DEBUG_PRINTF("index_add: Adding index for line %d: %p.\n", linenum,
+		DEBUG_PRINTF("index_add: Adding index for line %u: %p.\n", linenum,
 			sourcepos - tokenizer_start());
 		#endif
 	#endif
 }
 /*---------------------------------------------------------------------------*/
-static void jump_linenum_slow(int linenum) {
+static void jump_linenum_slow(uint32_t linenum) {
   tokenizer_init(program_ptr);
   while(tokenizer_num() != linenum) {
     do {
@@ -485,20 +485,20 @@ static void jump_linenum_slow(int linenum) {
     } while(tokenizer_token() != TOKENIZER_NUMBER);
 	#if DEBUG
       #if VERBOSE
-        DEBUG_PRINTF("jump_linenum_slow: Found line %d.\n", tokenizer_num());
+        DEBUG_PRINTF("jump_linenum_slow: Found line %u.\n", tokenizer_num());
 	  #endif
 	#endif
   }
 }
 /*---------------------------------------------------------------------------*/
-static void jump_linenum(int linenum) {
+static void jump_linenum(uint32_t linenum) {
   char const* pos = index_find(linenum);
   if(pos != NULL) {
-    DEBUG_PRINTF("jump_linenum: Going to line %d.\n", linenum);
+    DEBUG_PRINTF("jump_linenum: Going to line %u.\n", linenum);
     tokenizer_goto(pos);
   } else {
     /* We'll try to find a yet-unindexed line to jump to. */
-    DEBUG_PRINTF("jump_linenum: Calling jump_linenum_slow for line %d.\n", linenum);
+    DEBUG_PRINTF("jump_linenum: Calling jump_linenum_slow for line %u.\n", linenum);
     jump_linenum_slow(linenum);
   }
 }
@@ -585,7 +585,7 @@ static void let_statement(void){
 }
 /*---------------------------------------------------------------------------*/
 static void gosub_statement(void){
-  int linenum;
+  uint32_t linenum;
   accept(TOKENIZER_GOSUB);
   linenum = tokenizer_num();
   accept(TOKENIZER_NUMBER);
@@ -659,7 +659,7 @@ static void for_statement(void) {
   accept(TOKENIZER_LF);
 
   for_state st;
-  st.line_after_for = (int32_t)tokenizer_num();
+  st.line_after_for = (uint32_t)tokenizer_num();
   st.for_variable_index = (int32_t)for_variable;
   st.to = (int32_t)to;
   for_push(st);
@@ -760,7 +760,7 @@ static void line_statement(void){
   save_position();
   
   #if VERBOSE
-    DEBUG_PRINTF("----------- Line number %d ---------\n", tokenizer_num());
+    DEBUG_PRINTF("----------- Line number %u ---------\n", (uint32_t)tokenizer_num());
   #endif
   index_add(tokenizer_num(), tokenizer_pos());
   accept(TOKENIZER_NUMBER);
