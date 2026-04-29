@@ -65,7 +65,7 @@ typedef VARIABLE_TYPE (*get_func)(void);
 
 typedef struct for_state {
   uint32_t line_after_for;
-  int32_t for_variable_index; /* 0..26 (a-z) */
+  int32_t for_variable_index; /* 0..25 (a-z) */
   int32_t to;
 } for_state;
 

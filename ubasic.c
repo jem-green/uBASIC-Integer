@@ -423,7 +423,7 @@ static char const* index_find(uint32_t linenum) {
     #if DEBUG
     	#if VERBOSE
       		if(lidx != NULL) {
-        		DEBUG_PRINTF("index_find: Step %3d. Found index for line %u: %p.\n",
+        		DEBUG_PRINTF("index_find: Step %3d. Found index for line %u: %td.\n",
         		step,
         		lidx->line_number,
         		lidx->program_text_position - tokenizer_start());
@@ -465,7 +465,7 @@ static void index_add(uint32_t linenum, char const* sourcepos) {
   }
   #if DEBUG
   	#if VERBOSE
-		DEBUG_PRINTF("index_add: Adding index for line %u: %p.\n", linenum,
+		DEBUG_PRINTF("index_add: Adding index for line %u: %td.\n", linenum,
 			sourcepos - tokenizer_start());
 		#endif
 	#endif
@@ -473,7 +473,7 @@ static void index_add(uint32_t linenum, char const* sourcepos) {
 /*---------------------------------------------------------------------------*/
 static void jump_linenum_slow(uint32_t linenum) {
   tokenizer_init(program_ptr);
-  while(tokenizer_num() != linenum) {
+  while(tokenizer_linenum() != linenum) {
     do {
       do {
         tokenizer_next();
@@ -485,7 +485,7 @@ static void jump_linenum_slow(uint32_t linenum) {
     } while(tokenizer_token() != TOKENIZER_NUMBER);
 	#if DEBUG
       #if VERBOSE
-        DEBUG_PRINTF("jump_linenum_slow: Found line %u.\n", tokenizer_num());
+        DEBUG_PRINTF("jump_linenum_slow: Found line %u.\n", tokenizer_linenum());
 	  #endif
 	#endif
   }
@@ -506,7 +506,7 @@ static void jump_linenum(uint32_t linenum) {
 static void goto_statement(void) {
   accept(TOKENIZER_GOTO);
   DEBUG_PRINTF("jump_linenum: goto.\n");
-  jump_linenum(tokenizer_num());
+  jump_linenum(tokenizer_linenum());
 }
 /*---------------------------------------------------------------------------*/
 static void print_statement(void) {
@@ -587,13 +587,13 @@ static void let_statement(void){
 static void gosub_statement(void){
   uint32_t linenum;
   accept(TOKENIZER_GOSUB);
-  linenum = tokenizer_num();
+  linenum = tokenizer_linenum();
   accept(TOKENIZER_NUMBER);
   accept(TOKENIZER_LF);
   if(*gosub_depth_cell < UBASIC_MAX_GOSUB_STACK_DEPTH) {
 
     /* Push the current return line into the configured gosub stack (memory or internal). */
-    gosub_push(tokenizer_num());
+    gosub_push(tokenizer_linenum());
 
     jump_linenum(linenum);
   } else {
@@ -659,12 +659,19 @@ static void for_statement(void) {
   accept(TOKENIZER_LF);
 
   for_state st;
-  st.line_after_for = (uint32_t)tokenizer_num();
+  if(tokenizer_token() == TOKENIZER_NUMBER) {
+    st.line_after_for = tokenizer_linenum();
+  } else {
+    DEBUG_PRINTF("for_statement: ERROR - Expected NUMBER token after LF, got %s\n",
+                 tokenizer_token_name(tokenizer_token()));
+    st.line_after_for = 0;
+  }
   st.for_variable_index = (int32_t)for_variable;
   st.to = (int32_t)to;
   for_push(st);
   #if VERBOSE
-    DEBUG_PRINTF("for_statement: new for, var %d to %d.\n", (int)st.for_variable_index, (int)st.to);
+    DEBUG_PRINTF("for_statement: new for, var %d to %d, line_after_for=%u.\n",
+                 (int)st.for_variable_index, (int)st.to, st.line_after_for);
   #endif
   
 }
@@ -760,9 +767,9 @@ static void line_statement(void){
   save_position();
   
   #if VERBOSE
-    DEBUG_PRINTF("----------- Line number %u ---------\n", (uint32_t)tokenizer_num());
+    DEBUG_PRINTF("----------- Line number %u ---------\n", tokenizer_linenum());
   #endif
-  index_add(tokenizer_num(), tokenizer_pos());
+  index_add(tokenizer_linenum(), tokenizer_pos());
   accept(TOKENIZER_NUMBER);
   statement();
 }

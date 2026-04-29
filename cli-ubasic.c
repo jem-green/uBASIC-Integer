@@ -109,7 +109,7 @@ static void add_line(const char *line) {
   uint32_t linenum;
   static char const *lineptr;
   lineptr = line;
-  linenum = atoi(lineptr);
+  linenum = (uint32_t)strtoul(lineptr, NULL, 10);
   int linelen = strlen(line);
   
   // want to check if the new line has content
@@ -194,15 +194,15 @@ static uint32_t find_linenum(uint32_t linenum) {
 	#endif 
   uint32_t currentLinenum;
   ptr = program;
-  currentLinenum = atoi(ptr);
-  while ((atoi(ptr) < linenum) && (*ptr != 0)) {
+  currentLinenum = (uint32_t)strtoul(ptr, NULL, 10);
+  while ((strtoul(ptr, NULL, 10) < linenum) && (*ptr != 0)) {
     #if DEBUG
     #if VERBOSE
-      DEBUG_PRINTF("find_linenum: Current line %u.\n", (uint32_t)atoi(ptr));
+      DEBUG_PRINTF("find_linenum: Current line %u.\n", (uint32_t)strtoul(ptr, NULL, 10));
     #endif
     #endif
 
-    currentLinenum = atoi(ptr);
+    currentLinenum = (uint32_t)strtoul(ptr, NULL, 10);
 
     // Move to the end of the line
     // or end of the file
@@ -213,8 +213,8 @@ static uint32_t find_linenum(uint32_t linenum) {
     ptr++;
 
     // Prevent replacing the last found linenum if end of file.
-    if (atoi(ptr) > 0) {
-      currentLinenum = atoi(ptr);
+    if (strtoul(ptr, NULL, 10) > 0) {
+      currentLinenum = (uint32_t)strtoul(ptr, NULL, 10);
     }
     #if DEBUG
     #if VERBOSE

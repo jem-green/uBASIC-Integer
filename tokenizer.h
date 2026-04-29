@@ -30,6 +30,7 @@
 #ifndef __TOKENIZER_H__
 #define __TOKENIZER_H__
 
+#include <stdint.h>
 #include "vartype.h"
 
 enum {
@@ -81,6 +82,7 @@ void tokenizer_reset(void);
 void tokenizer_next(void);
 int tokenizer_token(void);
 VARIABLE_TYPE tokenizer_num(void);
+uint32_t tokenizer_linenum(void);
 int tokenizer_variable_num(void);
 void tokenizer_string(char *dest, int len);
 int tokenizer_finished(void);

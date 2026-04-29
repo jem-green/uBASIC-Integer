@@ -41,10 +41,11 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 static char const *ptr, *nextptr, *startptr;
 
-#define MAX_NUMLEN 6
+#define MAX_NUMLEN 11  // Max 10 digits for uint32_t (4294967295) plus 1
 
 struct keyword_token {
   char *keyword;
@@ -204,7 +205,7 @@ static int get_next_token(void) {
     }
   }
 
-  if((*ptr >= 'a' && *ptr <= 'z') || (*ptr >= 'A' && *ptr <= 'Z')) {
+  if(*ptr >= 'a' && *ptr <= 'z') {
     nextptr = ptr + 1;
     return TOKENIZER_VARIABLE;
   }
@@ -269,6 +270,11 @@ VARIABLE_TYPE tokenizer_num(void)
   return atoi(ptr);
 }
 /*---------------------------------------------------------------------------*/
+uint32_t tokenizer_linenum(void)
+{
+  return (uint32_t)strtoul(ptr, NULL, 10);
+}
+/*---------------------------------------------------------------------------*/
 void tokenizer_string(char *dest, int len){
   char *string_end;
   int string_len;
@@ -301,9 +307,6 @@ int tokenizer_finished(void) {
 int tokenizer_variable_num(void) {
   if(*ptr >= 'a' && *ptr <= 'z') {
     return *ptr - 'a';
-  }
-  if(*ptr >= 'A' && *ptr <= 'Z') {
-    return 26 + (*ptr - 'A');
   }
   return -1;
 }
