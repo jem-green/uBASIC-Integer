@@ -57,8 +57,8 @@ static void reset_control_state(void);
 static VARIABLE_TYPE expr(void);
 void set_variable(int varum, VARIABLE_TYPE value);
 VARIABLE_TYPE get_variable(int varnum);
-static void gosub_push(int32_t line_num);
-static int32_t gosub_pop(void);
+static void gosub_push(uint32_t line_num);
+static uint32_t gosub_pop(void);
 static void for_push(for_state state);
 static for_state for_pop(void);
 
@@ -335,8 +335,23 @@ static int term(void){
 static VARIABLE_TYPE expr(void){
   int t1, t2;
   int op;
+  int unary_minus = 0;
+  
+  /* Handle unary + or - */
+  if (tokenizer_token() == TOKENIZER_PLUS) {
+    accept(TOKENIZER_PLUS);
+  } else if (tokenizer_token() == TOKENIZER_MINUS) {
+    accept(TOKENIZER_MINUS);
+    unary_minus = 1;
+  }
 
   t1 = term();
+  
+  /* Apply unary minus if present */
+  if (unary_minus) {
+    t1 = -t1;
+  }
+  
   op = tokenizer_token();
   DEBUG_PRINTF("expr: token %s.\n", tokenizer_token_name(op));
   while(op == TOKENIZER_PLUS ||
@@ -472,23 +487,25 @@ static void index_add(uint32_t linenum, char const* sourcepos) {
 }
 /*---------------------------------------------------------------------------*/
 static void jump_linenum_slow(uint32_t linenum) {
+  DEBUG_PRINTF("jump_linenum_slow: Looking for line %u.\n", linenum);
   tokenizer_init(program_ptr);
   while(tokenizer_linenum() != linenum) {
     do {
-      do {
-        tokenizer_next();
-      } while(tokenizer_token() != TOKENIZER_LF &&
-          tokenizer_token() != TOKENIZER_ENDOFINPUT);
-      if(tokenizer_token() == TOKENIZER_LF) {
-        tokenizer_next();
-      }
-    } while(tokenizer_token() != TOKENIZER_NUMBER);
+      tokenizer_skip();
+    } while(tokenizer_token() != TOKENIZER_NUMBER &&
+            tokenizer_token() != TOKENIZER_ENDOFINPUT);
 	#if DEBUG
       #if VERBOSE
         DEBUG_PRINTF("jump_linenum_slow: Found line %u.\n", tokenizer_linenum());
 	  #endif
 	#endif
+    if(tokenizer_token() == TOKENIZER_ENDOFINPUT) {
+      DEBUG_PRINTF("jump_linenum_slow: Line %u not found!\n", linenum);
+      ended = 1;
+      return;
+    }
   }
+  DEBUG_PRINTF("jump_linenum_slow: Successfully jumped to line %u.\n", linenum);
 }
 /*---------------------------------------------------------------------------*/
 static void jump_linenum(uint32_t linenum) {
@@ -505,15 +522,13 @@ static void jump_linenum(uint32_t linenum) {
 /*---------------------------------------------------------------------------*/
 static void goto_statement(void) {
   accept(TOKENIZER_GOTO);
-  DEBUG_PRINTF("jump_linenum: goto.\n");
+  DEBUG_PRINTF("goto_statement: goto.\n");
   jump_linenum(tokenizer_linenum());
 }
 /*---------------------------------------------------------------------------*/
 static void print_statement(void) {
-  // string additions - buffer for complete line
   static char buf[128];
   buf[0]=0;
-  // end of string additions
   accept(TOKENIZER_PRINT);
   DEBUG_PRINTF("print_statement: Loop.\n");
   do {
@@ -585,17 +600,20 @@ static void let_statement(void){
 }
 /*---------------------------------------------------------------------------*/
 static void gosub_statement(void){
-  uint32_t linenum;
+  uint32_t target_line;
+  uint32_t return_line;
   accept(TOKENIZER_GOSUB);
-  linenum = tokenizer_linenum();
+  target_line = tokenizer_linenum();
   accept(TOKENIZER_NUMBER);
   accept(TOKENIZER_LF);
+  
+  /* After LF, tokenizer is positioned at the next line number */
+  return_line = tokenizer_linenum();
+  
   if(*gosub_depth_cell < UBASIC_MAX_GOSUB_STACK_DEPTH) {
-
-    /* Push the current return line into the configured gosub stack (memory or internal). */
-    gosub_push(tokenizer_linenum());
-
-    jump_linenum(linenum);
+    /* Push the return line into the gosub stack */
+    gosub_push(return_line);
+    jump_linenum(target_line);
   } else {
     DEBUG_PRINTF("gosub_statement: gosub stack exhausted.\n");
   }
@@ -604,7 +622,7 @@ static void gosub_statement(void){
 static void return_statement(void){
   accept(TOKENIZER_RETURN);
   if(*gosub_depth_cell > 0) {
-    int32_t retline = gosub_pop();
+    uint32_t retline = gosub_pop();
     jump_linenum(retline);
   } else {
     DEBUG_PRINTF("return_statement: non-matching return.\n");
@@ -787,7 +805,7 @@ static VARIABLE_TYPE get_variable(int varnum){
   return 0;
 }
 /*---------------------------------------------------------------------------*/
-static int32_t gosub_pop(void) {
+static uint32_t gosub_pop(void) {
   int32_t ptr = *gosub_depth_cell;
   if (ptr == 0) {
     DEBUG_PRINTF("gosub_pop: underflow (ptr=0)\n");
@@ -798,7 +816,7 @@ static int32_t gosub_pop(void) {
   return gosub_stack_mem[ptr];
 }
 /*---------------------------------------------------------------------------*/
-static void gosub_push(int32_t line_num) {
+static void gosub_push(uint32_t line_num) {
   int32_t ptr = *gosub_depth_cell;
   if (ptr >= UBASIC_MAX_GOSUB_STACK_DEPTH) {
     DEBUG_PRINTF("gosub_push: overflow (ptr=%d)\n", (int)ptr);

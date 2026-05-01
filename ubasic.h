@@ -91,7 +91,7 @@ void ubasic_reset(void);  /* Clears variables */
 void ubasic_run(void);
 int ubasic_finished(void);
 void ubasic_load_program(const char *program); /* Preserves vars */
-void ubasic_resume(void);  /* Resume from saved position in memory */
+
 
 /* I/O function setters matching C# wrapper API */
 void ubasic_set_out_function(out_func func);
