@@ -74,7 +74,7 @@ Do not apply C rules to other languages (Arduino, C#, IL descriptions, etc.).
 
 
 
-\## 4. Tiny BASIC Grammar Rules (Project-Specific)
+\## 4. uBasic Grammar Rules (Project-Specific)
 
 The interpreter implements a uBasic dialect with:
 
