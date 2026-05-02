@@ -310,8 +310,7 @@ static int term(void){
   op = tokenizer_token();
   DEBUG_PRINTF("term: token '%s'.\n", tokenizer_token_name(op));
   while(op == TOKENIZER_ASTR ||
-       op == TOKENIZER_SLASH ||
-       op == TOKENIZER_MOD) {
+       op == TOKENIZER_SLASH) {
     tokenizer_next();
     f2 = factor();
     DEBUG_PRINTF("term: %d %d %d\n", f1, op, f2);
@@ -321,9 +320,6 @@ static int term(void){
       break;
     case TOKENIZER_SLASH:
       f1 = f1 / f2;
-      break;
-    case TOKENIZER_MOD:
-      f1 = f1 % f2;
       break;
     }
     op = tokenizer_token();
@@ -355,9 +351,7 @@ static VARIABLE_TYPE expr(void){
   op = tokenizer_token();
   DEBUG_PRINTF("expr: token %s.\n", tokenizer_token_name(op));
   while(op == TOKENIZER_PLUS ||
-       op == TOKENIZER_MINUS ||
-       op == TOKENIZER_AND ||
-       op == TOKENIZER_OR) {
+       op == TOKENIZER_MINUS) {
     tokenizer_next();
     t2 = term();
     DEBUG_PRINTF("expr: %d %d %d.\n", t1, op, t2);
@@ -367,12 +361,6 @@ static VARIABLE_TYPE expr(void){
       break;
     case TOKENIZER_MINUS:
       t1 = t1 - t2;
-      break;
-    case TOKENIZER_AND:
-      t1 = t1 & t2;
-      break;
-    case TOKENIZER_OR:
-      t1 = t1 | t2;
       break;
     }
     op = tokenizer_token();
@@ -572,13 +560,9 @@ static void if_statement(void){
   } else {
     do {
       tokenizer_next();
-    } while(tokenizer_token() != TOKENIZER_ELSE &&
-        tokenizer_token() != TOKENIZER_LF &&
+    } while(tokenizer_token() != TOKENIZER_LF &&
         tokenizer_token() != TOKENIZER_ENDOFINPUT);
-    if(tokenizer_token() == TOKENIZER_ELSE) {
-      tokenizer_next();
-      statement();
-    } else if(tokenizer_token() == TOKENIZER_LF) {
+    if(tokenizer_token() == TOKENIZER_LF) {
       tokenizer_next();
     }
   }
