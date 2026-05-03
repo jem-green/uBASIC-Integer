@@ -624,13 +624,24 @@ static void rem_statement(void) {
 /*---------------------------------------------------------------------------*/
 static void next_statement(void){
   int var;
+  int i;
 
   accept(TOKENIZER_NEXT);
   var = tokenizer_variable_num();
   accept(TOKENIZER_VARIABLE);
-  if(*for_depth_cell > 0 &&
-     var == (int)for_stack[*for_depth_cell - 1].for_variable_index) {
-    for_state top = for_stack[*for_depth_cell - 1];
+
+  /* Search stack from top down for matching FOR var (Altair/Microsoft BASIC behavior).
+     Any inner frames above the match are unwound and discarded. */
+  for(i = *for_depth_cell - 1; i >= 0; i--) {
+    if((int)for_stack[i].for_variable_index == var) {
+      break;
+    }
+  }
+
+  if(i >= 0) {
+    /* Discard any inner loop frames above the matched one */
+    *for_depth_cell = i + 1;
+    for_state top = for_stack[i];
     set_variable(var, get_variable(var) + 1);
     if(get_variable(var) <= top.to) {
       jump_linenum(top.line_after_for);
@@ -639,10 +650,7 @@ static void next_statement(void){
       accept(TOKENIZER_LF);
     }
   } else {
-    if (*for_depth_cell > 0) {
-      DEBUG_PRINTF("next_statement: non-matching next (expected %d, found %d).\n",
-          (int)for_stack[*for_depth_cell - 1].for_variable_index, var);
-    }
+    DEBUG_PRINTF("next_statement: no matching FOR for variable %d.\n", var);
     accept(TOKENIZER_LF);
   }
 
