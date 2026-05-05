@@ -354,6 +354,10 @@ static int term(void){
       f1 = f1 * f2;
       break;
     case TOKENIZER_SLASH:
+      if(f2 == 0) {
+        runtime_error("/0", "Division by zero", current_line_number);
+        return 0;
+      }
       f1 = f1 / f2;
       break;
     }
