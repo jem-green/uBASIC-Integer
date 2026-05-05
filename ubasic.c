@@ -642,7 +642,7 @@ static void gosub_statement(void){
     gosub_push(return_line);
     jump_linenum(target_line);
   } else {
-    DEBUG_PRINTF("gosub_statement: gosub stack exhausted.\n");
+    runtime_error("GS", "GOSUB stack overflow", current_line_number);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -652,7 +652,7 @@ static void return_statement(void){
     uint32_t retline = gosub_pop();
     jump_linenum(retline);
   } else {
-    DEBUG_PRINTF("return_statement: non-matching return.\n");
+    runtime_error("RS", "RETURN without GOSUB", current_line_number);
   }
 }
 /*---------------------------------------------------------------------------*/

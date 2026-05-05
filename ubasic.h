@@ -47,7 +47,7 @@ typedef void (*err_func)(const char *code, const char *description, uint32_t lin
 
 /*
  * Classic 8-bit BASIC memory layout:
- *   LOW ADDRESSES (start of buffer):
+ *   LOW MEMORY (start of buffer):
  *     int32_t resume_offset at offset 0 (tokenizer position for resume)
  *     int32_t gosub_depth at offset 4
  *     int32_t for_depth at offset 8
@@ -56,7 +56,7 @@ typedef void (*err_func)(const char *code, const char *description, uint32_t lin
  *     program bytes (NUL-terminated)
  *     VARIABLE_TYPE variables[UBASIC_VARIABLE_COUNT] (after program)
  *     uint8_t heap[UBASIC_HEAP_BYTES] (optional, for future string/double)
- *   HIGH ADDRESSES: (free space)
+ *   HIGH MEMORY (free space)
  */
 #define UBASIC_MAX_GOSUB_STACK_DEPTH 10
 #define UBASIC_MAX_FOR_STACK_DEPTH 4
