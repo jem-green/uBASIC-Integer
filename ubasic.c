@@ -61,6 +61,8 @@ static void gosub_push(uint32_t line_num);
 static uint32_t gosub_pop(void);
 static void for_push(for_state state);
 static for_state for_pop(void);
+static void push_statement(void);
+static void pop_statement(void);
 static void runtime_error(const char *code, const char *description, uint32_t line);
 
 static char const *program_ptr;
@@ -75,6 +77,8 @@ static int32_t *for_depth_cell = NULL;
 static int32_t *gosub_stack_mem = NULL;
 static for_state *for_stack = NULL;
 static VARIABLE_TYPE *variables_mem = NULL;
+static int32_t *push_depth_cell = NULL;
+static int32_t *push_stack_mem = NULL;
 
 struct line_index {
   uint32_t line_number;
@@ -129,6 +133,8 @@ void ubasic_init(uint8_t *memory, uint32_t memory_bytes) {
   for_depth_cell = (int32_t *)(memory + UBASIC_MEM_FOR_DEPTH_OFFSET);
   gosub_stack_mem = (int32_t *)(memory + UBASIC_MEM_GOSUB_STACK_OFFSET);
   for_stack = (for_state *)(memory + UBASIC_MEM_FOR_STACK_OFFSET);
+  push_depth_cell = (int32_t *)(memory + UBASIC_MEM_PUSH_DEPTH_OFFSET);
+  push_stack_mem = (int32_t *)(memory + UBASIC_MEM_PUSH_STACK_OFFSET);
   
   /* Don't initialize program_ptr or variables_mem - allows snapshot restore */
   #if VERBOSE
@@ -164,6 +170,9 @@ static void reset_control_state(void) {
   }
   if (for_stack != NULL) {
     memset(for_stack, 0, UBASIC_MAX_FOR_STACK_DEPTH * sizeof(for_state));
+  }
+  if (push_depth_cell != NULL) {
+    *push_depth_cell = 0;
   }
   last_error_code[0] = '\0';
   last_error_description = "";
@@ -798,6 +807,12 @@ static void statement(void){
   case TOKENIZER_END:
     end_statement();
     break;
+  case TOKENIZER_PUSH:
+    push_statement();
+    break;
+  case TOKENIZER_POP:
+    pop_statement();
+    break;
   case TOKENIZER_LET:
     accept(TOKENIZER_LET);
     /* Fall through. */
@@ -886,6 +901,41 @@ static for_state for_pop(void) {
     runtime_error("FS", "FOR stack underflow", current_line_number);
     return error_state;
   }
+}
+/*---------------------------------------------------------------------------*/
+static void push_statement(void) {
+  int32_t depth;
+  VARIABLE_TYPE value;
+  accept(TOKENIZER_PUSH);
+  value = expr();
+  if(ended) return;
+  depth = *push_depth_cell;
+  if(depth < UBASIC_MAX_PUSH_STACK_DEPTH) {
+    push_stack_mem[depth++] = (int32_t)value;
+    *push_depth_cell = depth;
+  } else {
+    runtime_error("PS", "PUSH stack overflow", current_line_number);
+    return;
+  }
+  accept(TOKENIZER_LF);
+}
+/*---------------------------------------------------------------------------*/
+static void pop_statement(void) {
+  int32_t depth;
+  int varnum;
+  accept(TOKENIZER_POP);
+  varnum = tokenizer_variable_num();
+  accept(TOKENIZER_VARIABLE);
+  if(ended) return;
+  depth = *push_depth_cell;
+  if(depth > 0) {
+    set_variable(varnum, (VARIABLE_TYPE)push_stack_mem[--depth]);
+    *push_depth_cell = depth;
+  } else {
+    runtime_error("PS", "POP stack underflow", current_line_number);
+    return;
+  }
+  accept(TOKENIZER_LF);
 }
 /*---------------------------------------------------------------------------*/
 void ubasic_set_out_function(out_func func) {

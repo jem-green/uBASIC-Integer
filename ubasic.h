@@ -60,6 +60,7 @@ typedef void (*err_func)(const char *code, const char *description, uint32_t lin
  */
 #define UBASIC_MAX_GOSUB_STACK_DEPTH 10
 #define UBASIC_MAX_FOR_STACK_DEPTH 4
+#define UBASIC_MAX_PUSH_STACK_DEPTH 16
 #define UBASIC_VARIABLE_COUNT 26
 
 #ifndef UBASIC_HEAP_BYTES
@@ -79,12 +80,18 @@ typedef struct for_state {
 #define UBASIC_MEM_GOSUB_STACK_OFFSET 12
 #define UBASIC_MEM_FOR_STACK_OFFSET \
   (UBASIC_MEM_GOSUB_STACK_OFFSET + UBASIC_MAX_GOSUB_STACK_DEPTH * (int)sizeof(int32_t))
+/* PUSH/POP stack: depth cell + int32_t slots */
+#define UBASIC_MEM_PUSH_DEPTH_OFFSET \
+  (UBASIC_MEM_FOR_STACK_OFFSET + UBASIC_MAX_FOR_STACK_DEPTH * (int)sizeof(for_state))
+#define UBASIC_MEM_PUSH_STACK_OFFSET \
+  (UBASIC_MEM_PUSH_DEPTH_OFFSET + (int)sizeof(int32_t))
 /* Program starts immediately after control structures */
 #define UBASIC_MEM_PROGRAM_OFFSET \
-  (UBASIC_MEM_FOR_STACK_OFFSET + UBASIC_MAX_FOR_STACK_DEPTH * (int)sizeof(for_state))
+  (UBASIC_MEM_PUSH_STACK_OFFSET + UBASIC_MAX_PUSH_STACK_DEPTH * (int)sizeof(int32_t))
 
 /* Variables placed in LOW memory after program (calculated at runtime) */
 #define UBASIC_VARIABLES_SIZE (UBASIC_VARIABLE_COUNT * (int)sizeof(VARIABLE_TYPE))
+#define UBASIC_PUSH_STACK_SIZE (UBASIC_MAX_PUSH_STACK_DEPTH * (int)sizeof(int32_t))
 #define UBASIC_MIN_MEMORY_BYTES (UBASIC_MEM_PROGRAM_OFFSET + 1u + UBASIC_VARIABLES_SIZE + UBASIC_HEAP_BYTES)
 
 // Public
