@@ -624,34 +624,30 @@ static void rem_statement(void) {
 /*---------------------------------------------------------------------------*/
 static void next_statement(void){
   int var;
-  int i;
 
   accept(TOKENIZER_NEXT);
   var = tokenizer_variable_num();
+  DEBUG_PRINTF("next_statement: next for variable %d.\n", var);
   accept(TOKENIZER_VARIABLE);
-
-  /* Search stack from top down for matching FOR var (Altair/Microsoft BASIC behavior).
-     Any inner frames above the match are unwound and discarded. */
-  for(i = *for_depth_cell - 1; i >= 0; i--) {
-    if((int)for_stack[i].for_variable_index == var) {
-      break;
-    }
-  }
-
-  if(i >= 0) {
-    /* Discard any inner loop frames above the matched one */
-    *for_depth_cell = i + 1;
-    for_state top = for_stack[i];
-    set_variable(var, get_variable(var) + 1);
-    if(get_variable(var) <= top.to) {
-      jump_linenum(top.line_after_for);
+  if(*for_depth_cell > 0) {
+    if(var == (int)for_stack[*for_depth_cell - 1].for_variable_index) {
+      DEBUG_PRINTF("next_statement: matching next for variable %d.\n", var);
+      for_state top = for_stack[*for_depth_cell - 1];
+      set_variable(var, get_variable(var) + 1);
+      if(get_variable(var) <= top.to) {
+        jump_linenum(top.line_after_for);
+      } else {
+        for_pop();
+        accept(TOKENIZER_LF);
+      }
     } else {
-      for_pop();
-      accept(TOKENIZER_LF);
+      DEBUG_PRINTF("next_statement: ERROR - non-matching next (expected %d, found %d).\n",
+          (int)for_stack[*for_depth_cell - 1].for_variable_index, var);
+      exit(1);
     }
   } else {
-    DEBUG_PRINTF("next_statement: no matching FOR for variable %d.\n", var);
-    accept(TOKENIZER_LF);
+    DEBUG_PRINTF("next_statement: ERROR - next without matching for.\n");
+    exit(1);
   }
 
 }
