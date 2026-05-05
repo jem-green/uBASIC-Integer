@@ -61,6 +61,7 @@ static void gosub_push(uint32_t line_num);
 static uint32_t gosub_pop(void);
 static void for_push(for_state state);
 static for_state for_pop(void);
+static void runtime_error(const char *code, const char *description, uint32_t line);
 
 static char const *program_ptr;
 #define MAX_STRINGLEN 40
@@ -85,6 +86,7 @@ struct line_index *line_index_head = NULL;
 struct line_index *line_index_current = NULL;
 
 static int ended;
+static uint32_t current_line_number;
 
 peek_func peek_function = NULL;
 poke_func poke_function = NULL;
@@ -97,6 +99,19 @@ out_func out_function = default_out_function;  /* Default to printf wrapper */
 put_func put_function = NULL;
 in_func in_function = NULL;
 get_func get_function = NULL;
+
+static void default_error_function(const char *code, const char *description, uint32_t line) {
+  if(line > 0) {
+    fprintf(stderr, "%s %s on line %u\n", code, description, line);
+  } else {
+    fprintf(stderr, "%s %s\n", code, description);
+  }
+}
+
+static err_func error_function = default_error_function;
+static char last_error_code[3] = "";
+static const char *last_error_description = "";
+static uint32_t last_error_line = 0;
 
 /*
  * Buffer passed to ubasic_init (see UBASIC_*_OFFSET in ubasic.h):
@@ -150,7 +165,27 @@ static void reset_control_state(void) {
   if (for_stack != NULL) {
     memset(for_stack, 0, UBASIC_MAX_FOR_STACK_DEPTH * sizeof(for_state));
   }
+  last_error_code[0] = '\0';
+  last_error_description = "";
+  last_error_line = 0;
+  current_line_number = 0;
   ended = 0;
+}
+/*---------------------------------------------------------------------------*/
+static void runtime_error(const char *code, const char *description, uint32_t line) {
+  if(code != NULL && code[0] != '\0') {
+    last_error_code[0] = code[0];
+    last_error_code[1] = code[1] != '\0' ? code[1] : '\0';
+    last_error_code[2] = '\0';
+  } else {
+    last_error_code[0] = '\0';
+  }
+  last_error_description = description != NULL ? description : "";
+  last_error_line = line;
+  if(error_function != NULL) {
+    error_function(last_error_code, last_error_description, line);
+  }
+  ended = 1;
 }
 /*---------------------------------------------------------------------------*/
 void ubasic_reset(void) {
@@ -264,8 +299,8 @@ static void accept(int token){
     DEBUG_PRINTF("accept: Token not what was expected (expected '%s', got %s).\n",
 	tokenizer_token_name(token),
 	tokenizer_token_name(tokenizer_token()));
-    tokenizer_error_print();
-    exit(1);
+    runtime_error("TS", "Token syntax mismatch", current_line_number);
+    return;
   }
   DEBUG_PRINTF("accept: Expected '%s', got it.\n", tokenizer_token_name(token));
   tokenizer_next();
@@ -489,7 +524,7 @@ static void jump_linenum_slow(uint32_t linenum) {
 	#endif
     if(tokenizer_token() == TOKENIZER_ENDOFINPUT) {
       DEBUG_PRINTF("jump_linenum_slow: Line %u not found!\n", linenum);
-      ended = 1;
+      runtime_error("UL", "Undefined line target", current_line_number);
       return;
     }
   }
@@ -560,6 +595,10 @@ static void if_statement(void){
   } else {
     do {
       tokenizer_next();
+      if(tokenizer_token() == TOKENIZER_ERROR) {
+        runtime_error("TS", "Unsupported statement", current_line_number);
+        return;
+      }
     } while(tokenizer_token() != TOKENIZER_LF &&
         tokenizer_token() != TOKENIZER_ENDOFINPUT);
     if(tokenizer_token() == TOKENIZER_LF) {
@@ -624,7 +663,9 @@ static void rem_statement(void) {
 /*---------------------------------------------------------------------------*/
 static void next_statement(void){
   int var;
+  uint32_t line;
 
+  line = current_line_number;
   accept(TOKENIZER_NEXT);
   var = tokenizer_variable_num();
   DEBUG_PRINTF("next_statement: next for variable %d.\n", var);
@@ -643,11 +684,11 @@ static void next_statement(void){
     } else {
       DEBUG_PRINTF("next_statement: ERROR - non-matching next (expected %d, found %d).\n",
           (int)for_stack[*for_depth_cell - 1].for_variable_index, var);
-      exit(1);
+      runtime_error("MN", "Non-matching NEXT", line);
     }
   } else {
     DEBUG_PRINTF("next_statement: ERROR - next without matching for.\n");
-    exit(1);
+    runtime_error("NF", "NEXT without FOR", line);
   }
 
 }
@@ -764,18 +805,20 @@ static void statement(void){
     break;
   default:
     DEBUG_PRINTF("statement: not implemented %d.\n", token);
-    exit(1);
+    runtime_error("TS", "Unsupported statement", current_line_number);
+    return;
   }
 }
 /*---------------------------------------------------------------------------*/
 static void line_statement(void){
   /* Save position before executing line for resume capability */
   save_position();
+  current_line_number = tokenizer_linenum();
   
   #if VERBOSE
-    DEBUG_PRINTF("----------- Line number %u ---------\n", tokenizer_linenum());
+    DEBUG_PRINTF("----------- Line number %u ---------\n", current_line_number);
   #endif
-  index_add(tokenizer_linenum(), tokenizer_pos());
+  index_add(current_line_number, tokenizer_pos());
   accept(TOKENIZER_NUMBER);
   statement();
 }
@@ -797,6 +840,7 @@ static uint32_t gosub_pop(void) {
   int32_t ptr = *gosub_depth_cell;
   if (ptr == 0) {
     DEBUG_PRINTF("gosub_pop: underflow (ptr=0)\n");
+    runtime_error("RS", "RETURN without GOSUB", current_line_number);
     return 0;
   }
   ptr--;
@@ -808,6 +852,7 @@ static void gosub_push(uint32_t line_num) {
   int32_t ptr = *gosub_depth_cell;
   if (ptr >= UBASIC_MAX_GOSUB_STACK_DEPTH) {
     DEBUG_PRINTF("gosub_push: overflow (ptr=%d)\n", (int)ptr);
+    runtime_error("GS", "GOSUB stack overflow", current_line_number);
     return;
   }
   gosub_stack_mem[ptr] = line_num;
@@ -821,6 +866,7 @@ static void for_push(for_state state) {
     *for_depth_cell = depth;
   } else {
     DEBUG_PRINTF("for_push: for stack depth exceeded.\n");
+    runtime_error("FS", "FOR stack overflow", current_line_number);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -833,12 +879,29 @@ static for_state for_pop(void) {
     return value;
   } else {
     DEBUG_PRINTF("for_pop: for stack underflow.\n");
+    runtime_error("FS", "FOR stack underflow", current_line_number);
     return error_state;
   }
 }
 /*---------------------------------------------------------------------------*/
 void ubasic_set_out_function(out_func func) {
   out_function = func;
+}
+/*---------------------------------------------------------------------------*/
+void ubasic_set_error_function(err_func func) {
+  error_function = func != NULL ? func : default_error_function;
+}
+/*---------------------------------------------------------------------------*/
+const char *ubasic_last_error_code(void) {
+  return last_error_code;
+}
+/*---------------------------------------------------------------------------*/
+const char *ubasic_last_error_description(void) {
+  return last_error_description;
+}
+/*---------------------------------------------------------------------------*/
+uint32_t ubasic_last_error_line(void) {
+  return last_error_line;
 }
 /*---------------------------------------------------------------------------*/
 
