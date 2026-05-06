@@ -280,8 +280,8 @@ void tokenizer_string(char *dest, int len){
     return;
   }
   string_len = string_end - ptr - 1;
-  if(len < string_len) {
-    string_len = len;
+  if(len < string_len + 1) {
+    string_len = len - 1;
   }
   memcpy(dest, ptr + 1, string_len);
   dest[string_len] = 0;
