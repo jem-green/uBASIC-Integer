@@ -14,6 +14,7 @@ This document lists all runtime error codes emitted by the uBasic interpreter.
 | `/0` | Division by zero | Fatal | Current line | Arithmetic expression attempted division by zero. Sets `ended = 1`. |
 | `TS` | Unsupported statement | Fatal | Current line | Parser encountered unimplemented or invalid statement token. Sets `ended = 1`. |
 | `UL` | Undefined line target | Fatal | Calling line | GOTO or GOSUB references a line number that does not exist. Sets `ended = 1`. |
+| `IC` | Invalid command | CLI | N/A | Command entered in CLI is not recognized. |
 
 ## Stack Limits
 
