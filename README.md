@@ -1,5 +1,5 @@
-uBASIC: a really simple BASIC interpreter
-=========================================
+uBASIC-Integer: a really simple BASIC interpreter
+=================================================
 
 http://dunkels.com/adam/ubasic/
 
