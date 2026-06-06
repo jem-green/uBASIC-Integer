@@ -1,4 +1,4 @@
-uBASIC-Integer: a really simple BASIC interpreter
+ubasic-Integer: a really simple BASIC interpreter
 =================================================
 
 http://dunkels.com/adam/ubasic/
