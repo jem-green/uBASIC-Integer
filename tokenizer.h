@@ -34,11 +34,22 @@
 #include "vartype.h"
 
 enum {
-  TOKENIZER_ERROR,
-  TOKENIZER_ENDOFINPUT,
-  TOKENIZER_NUMBER,
-  TOKENIZER_STRING,
-  TOKENIZER_VARIABLE,
+  TOKENIZER_ERROR = 0,		// 0
+  TOKENIZER_ENDOFINPUT,		// 1
+  TOKENIZER_NUMBER,			// 2
+  TOKENIZER_STRING,			// 3
+  TOKENIZER_VARIABLE,		// 4
+  // All non-ASCII tokens start at 0x80
+  TOKENIZER_LT = 0x80,      // '<'
+  TOKENIZER_GT,             // '>'
+  TOKENIZER_EQ,             // '='
+  TOKENIZER_LTE,            // '<='
+  TOKENIZER_GTE,            // '>='
+  TOKENIZER_NE,             // '<>' or '!='
+  TOKENIZER_LF,             // '\n'
+  TOKENIZER_CR,             // '\r'
+
+  // Keyword and extended tokens (continue from above)
   TOKENIZER_LET,
   TOKENIZER_PRINT,
   TOKENIZER_IF,
@@ -63,12 +74,7 @@ enum {
   TOKENIZER_SLASH,
   TOKENIZER_HASH,
   TOKENIZER_LEFTPAREN,
-  TOKENIZER_RIGHTPAREN,
-  TOKENIZER_LT,
-  TOKENIZER_GT,
-  TOKENIZER_EQ,
-  TOKENIZER_LF,
-  TOKENIZER_CR
+  TOKENIZER_RIGHTPAREN
 };
 
 // Public
